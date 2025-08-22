@@ -132,7 +132,6 @@ static void midi_platform_send(MidiMessage msg) {
 }
 
 void midi_platform_send_sysex(unsigned char *data, int len) {
-  printf("sysex [%d] %d %d %d\n", len, data[0], data[1], data[2]);
   for (int i = 0; i < MAX_MIDI_IN_OUTS; i++) {
     if (midi_outputs[i]) {
       fwrite(data, 1, len, midi_outputs[i]);
