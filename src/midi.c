@@ -24,9 +24,13 @@ static void send_message(MidiMessage msg) {
 }
 
 
+
 #ifdef __linux__
 
 #include <sys/select.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdio.h>
 
 static const int sizes[] = {
   #define X(e, val, len) [val] = len,
@@ -34,9 +38,10 @@ static const int sizes[] = {
   #undef X
 };
 
-typedef struct { FILE *fp; int fd; } MidiInput;
-static MidiInput midi_inputs[16];
-static FILE *midi_outputs[16];
+typedef struct { int fd; } MidiInput;
+#define MAX_MIDI_IN_OUTS 16
+static MidiInput midi_inputs[MAX_MIDI_IN_OUTS];
+static FILE *midi_outputs[MAX_MIDI_IN_OUTS];
 
 
 static int midi_thread(void *udata) {
@@ -45,67 +50,95 @@ static int midi_thread(void *udata) {
     fd_set readset;
     int max_fd = 0;
     FD_ZERO(&readset);
-    for (int i = 0; midi_inputs[i].fp; i++) {
-      MidiInput mi = midi_inputs[i];
-      FD_SET(mi.fd, &readset);
-      if (mi.fd > max_fd) { max_fd = mi.fd; }
+    
+    for (int i = 0; i < MAX_MIDI_IN_OUTS && midi_inputs[i].fd >= 0; i++) {
+      int fd = midi_inputs[i].fd;
+      FD_SET(fd, &readset);
+      if (fd > max_fd) { max_fd = fd; }
+    }
+    
+    /* If no devices are open, sleep to prevent a high-CPU busy-loop */
+    if (max_fd == 0) {
+      SDL_Delay(100);
+      continue;
     }
 
-    /* wait for input */
     select(max_fd + 1, &readset, NULL, NULL, NULL);
 
-    /* handle inputs */
-    for (int i = 0; midi_inputs[i].fp; i++) {
-      MidiInput mi = midi_inputs[i];
-      if (FD_ISSET(mi.fd, &readset)) {
-        /* read midi message */
-        MidiMessage msg;
-        msg.b[0] = fgetc(mi.fp);
-        int n = sizes[midi_type(msg)];
-        for (int i = 1; i < n; i++) {
-          msg.b[i] = fgetc(mi.fp);
+    for (int i = 0; i < MAX_MIDI_IN_OUTS && midi_inputs[i].fd >= 0; i++) {
+      int fd = midi_inputs[i].fd;
+      if (FD_ISSET(fd, &readset)) {
+        unsigned char raw_buf[128];
+        int bytes_read = read(fd, raw_buf, sizeof(raw_buf));
+        int head = 0;
+
+        while (head < bytes_read) {
+          MidiMessage msg;
+          msg.b[0] = raw_buf[head];
+          int msg_len = sizes[midi_type(msg)];
+          
+          if (head + msg_len > bytes_read) { break; }
+
+          for (int j = 1; j < msg_len; j++) {
+            msg.b[j] = raw_buf[head + j];
+          }
+          send_message(msg);
+          head += msg_len;
         }
-        send_message(msg);
       }
     }
   }
-
   return 0;
 }
 
 
 static void midi_platform_init(void) {
   char filename[32];
+  int input_count = 0;
+  
+  for (int i = 0; i < MAX_MIDI_IN_OUTS; i++) {
+    midi_inputs[i].fd = -1;
+  }
 
-  /* find and open inputs */
-  for (int i = 1; i < 16; i++) {
+  for (int i = 0; i < MAX_MIDI_IN_OUTS; i++) {
     sprintf(filename, "/dev/midi%d", i);
-    FILE *fp = fopen(filename, "rb");
-    if (fp) {
-      midi_inputs[i - 1] = (MidiInput) { .fp = fp, .fd = fileno(fp) };
+    int fd = open(filename, O_RDONLY | O_NONBLOCK); 
+    if (fd >= 0) {
+      midi_inputs[input_count].fd = fd;
+      input_count++;
     }
   }
 
-  /* find and open outputs */
-  for (int i = 1; i < 16; i++) {
+  for (int i = 1; i < MAX_MIDI_IN_OUTS; i++) {
     sprintf(filename, "/dev/midi%d", i);
     FILE *fp = fopen(filename, "wb");
-    if (fp) { midi_outputs[i - 1] = fp; }
+    if (fp) { 
+      midi_outputs[i - 1] = fp;
+    }
   }
-
-  /* init input thread */
+  
   SDL_CreateThread(midi_thread, "Midi Input", NULL);
 }
 
 
 static void midi_platform_send(MidiMessage msg) {
   int sz = sizes[midi_type(msg)];
-  for (int i = 0; midi_outputs[i]; i++) {
-    fwrite(&msg, sz, 1, midi_outputs[i]);
-    fflush(midi_outputs[i]);
+  for (int i = 0; i < MAX_MIDI_IN_OUTS; i++) {
+    if (midi_outputs[i]) {
+      fwrite(&msg, sz, 1, midi_outputs[i]);
+      fflush(midi_outputs[i]);
+    }
   }
 }
 
+void midi_platform_send_sysex(unsigned char *data, int len) {
+  for (int i = 0; i < MAX_MIDI_IN_OUTS; i++) {
+    if (midi_outputs[i]) {
+      fwrite(data, 1, len, midi_outputs[i]);
+      fflush(midi_outputs[i]);
+    }
+  }
+}
 #endif
 
 

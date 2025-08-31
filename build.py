@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7
+#!/usr/bin/env python3
 import os, sys, platform, shutil
 import re, threading, time, json
 from os import path
@@ -36,7 +36,7 @@ log_lock = threading.Lock()
 
 def log(msg, mode=Hint):
     log_lock.acquire()
-    print log_prefix[mode], msg
+    print(log_prefix[mode], msg)
     log_lock.release()
 
 
@@ -59,7 +59,8 @@ def load_config(filename):
         "Warn": Warn,
         "Error": Error
     }
-    execfile(filename, d)
+    with open(filename, 'r') as f:
+        exec(f.read(), d)
     config.update(d)
 
     if len(config["source"]) == 0:
@@ -75,7 +76,7 @@ def load_cache(cache_file):
 
 
 def update_cache(cache_file, obj):
-    with open(cache_file, "wb") as fp:
+    with open(cache_file, "w") as fp:
         json.dump(obj, fp, indent=2)
     log("updated cache")
 
@@ -110,8 +111,8 @@ def get_file_info(filename):
                 if match:
                     includes.append( match.group(1) )
             # update hash
-            hash.update(line)
-            hash.update("\n")
+            hash.update(line.encode('utf-8'))
+            hash.update("\n".encode('utf-8'))
 
     res = { "hash": hash.hexdigest(), "includes": includes }
     file_info_cache[filename] = res
@@ -132,11 +133,13 @@ def get_deep_hash(filename):
 
     while len(files) > 0:
         f = files.pop()
+        if not f:
+            error("could not find file '%s'" % files.pop())
         info = get_file_info(f)
         processed.add(f)
 
         # update hash
-        h.update(info["hash"])
+        h.update(info["hash"].encode('utf-8'))
 
         # add includes
         for x in info["includes"]:
@@ -184,7 +187,7 @@ def build_compile_cmd():
 def obj_name(filename):
     """ creates the object file name for a given filename """
     filename = re.sub("[^\w]+", "_", filename)
-    return filename[:-2] + "_" + sha1(filename).hexdigest()[:8] + ".o"
+    return filename[:-2] + "_" + sha1(filename.encode('utf-8')).hexdigest()[:8] + ".o"
 
 
 def compile(cmd, filename):
@@ -250,7 +253,7 @@ if __name__ == "__main__":
     if not path.exists(object_dir):
         os.makedirs(object_dir)
 
-    if not path.exists(output_dir):
+    if not path.exists(output_dir) and output_dir:
         os.makedirs(output_dir)
 
 
@@ -264,9 +267,10 @@ if __name__ == "__main__":
 
     # delete object files for cfiles that no longer exist
     obj_files = set(map(obj_name, cfiles))
-    for f in os.listdir(object_dir):
-        if f not in obj_files:
-            os.remove(path.join(object_dir, f))
+    if path.exists(object_dir):
+        for f in os.listdir(object_dir):
+            if f not in obj_files:
+                os.remove(path.join(object_dir, f))
 
 
     # build list of all .c files that need compiling
@@ -282,7 +286,7 @@ if __name__ == "__main__":
         while True:
             try:
                 f = pending.pop()
-            except:
+            except IndexError:
                 break
             compile(cmd, f)
 
@@ -297,7 +301,7 @@ if __name__ == "__main__":
         config["post"]()
 
 
-    log("done [%.2fs]" % (time.time() - start_time))
+    print("done [%.2fs]" % (time.time() - start_time))
 
 
     if run_at_exit:
