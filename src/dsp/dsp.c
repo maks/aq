@@ -26,6 +26,7 @@ Node* new_line_node(void);
 Node* new_shaper_node(void);
 Node* new_delay_node(void);
 Node* new_reverb_node(void);
+Node* new_dtreverb_node(void);
 
 static struct { const char *name; NodeConstructor fn; } node_table[] = {
   { "dac",    new_dac_node    },
@@ -35,6 +36,7 @@ static struct { const char *name; NodeConstructor fn; } node_table[] = {
   { "line",   new_line_node   },
   { "shaper", new_shaper_node },
   { "reverb", new_reverb_node },
+  { "dattorro", new_dtreverb_node },
   { "delay",  new_delay_node  },
   { },
 };
