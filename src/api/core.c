@@ -76,6 +76,19 @@ static fe_Object* f_string(fe_Context *ctx, fe_Object *arg) {
   return fe_string(ctx, buf);
 }
 
+static fe_Object* f_string_bytes(fe_Context *ctx, fe_Object *arg) {
+  char buf[1024];
+  fe_Object *list = fe_bool(ctx, false); /* start with nil */
+  fe_tostring(ctx, fe_nextarg(ctx, &arg), buf, sizeof(buf));
+
+  int len = 0;
+  while (buf[len]) { len++; }
+  for (int i = len - 1; i >= 0; i--) {
+    list = fe_cons(ctx, fe_number(ctx, (unsigned char) buf[i]), list);
+  }
+  return list;
+}
+
 
 static fe_Object* f_read(fe_Context *ctx, fe_Object *arg) {
   char filename[128];
@@ -178,6 +191,7 @@ fex_Reg api_core[] = {
   { "mod",       f_mod       },
   { "pow",       f_pow       },
   { "string",    f_string    },
+  { "string->bytes", f_string_bytes },
   { "read",      f_read      },
   { "write",     f_write     },
   { "do-file",   f_do_file   },

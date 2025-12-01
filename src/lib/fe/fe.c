@@ -43,13 +43,15 @@
 enum {
  P_LET, P_SET, P_IF, P_FN, P_MAC, P_WHILE, P_QUOTE, P_AND, P_OR, P_DO, P_CONS,
  P_CAR, P_CDR, P_SETCAR, P_SETCDR, P_LIST, P_NOT, P_IS, P_ATOM, P_PRINT, P_LT,
- P_LTE, P_ADD, P_SUB, P_MUL, P_DIV, P_MAX
+ P_LTE, P_ADD, P_SUB, P_MUL, P_DIV,
+ P_BAND, P_BOR, P_BXOR, P_BNOT, P_SHL, P_SHR,
+ P_MAX
 };
 
 static const char *primnames[] = {
   "let", "=", "if", "fn", "mac", "while", "quote", "and", "or", "do", "cons",
   "car", "cdr", "setcar", "setcdr", "list", "not", "is", "atom", "print", "<",
-  "<=", "+", "-", "*", "/"
+  "<=", "+", "-", "*", "/", "band", "bor", "bxor", "bnot", "shl", "shr"
 };
 
 static const char *typenames[] = {
@@ -611,6 +613,14 @@ static fe_Object* argstoenv(fe_Context *ctx, fe_Object *prm, fe_Object *arg, fe_
     res = fe_bool(ctx, number(va) op number(vb)); \
   }
 
+#define bitop(op) {                                 \
+    int x = (int) fe_tonumber(ctx, evalarg());      \
+    while (!isnil(arg)) {                           \
+      x = x op (int) fe_tonumber(ctx, evalarg());   \
+    }                                               \
+    res = fe_number(ctx, x);                        \
+  }
+
 
 static fe_Object* eval(fe_Context *ctx, fe_Object *obj, fe_Object *env, fe_Object **newenv) {
   fe_Object *fn, *arg, *res;
@@ -742,6 +752,22 @@ static fe_Object* eval(fe_Context *ctx, fe_Object *obj, fe_Object *env, fe_Objec
         case P_SUB: arithop(-); break;
         case P_MUL: arithop(*); break;
         case P_DIV: arithop(/); break;
+        case P_BAND: bitop(&); break;
+        case P_BOR: bitop(|); break;
+        case P_BXOR: bitop(^); break;
+        case P_BNOT:
+          res = fe_number(ctx, ~(int) fe_tonumber(ctx, evalarg()));
+          break;
+        case P_SHL: {
+          int lhs = (int) fe_tonumber(ctx, evalarg());
+          int rhs = (int) fe_tonumber(ctx, evalarg());
+          res = fe_number(ctx, lhs << rhs);
+        } break;
+        case P_SHR: {
+          int lhs = (int) fe_tonumber(ctx, evalarg());
+          int rhs = (int) fe_tonumber(ctx, evalarg());
+          res = fe_number(ctx, lhs >> rhs);
+        } break;
       }
       break;
 
