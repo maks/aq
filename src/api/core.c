@@ -4,7 +4,7 @@
 #include "fex.h"
 #include "app.h"
 
-#define MAX_SYSEX_LENGTH 256
+#define MAX_SYSEX_LENGTH 2048
 
 static fe_Object* f_exit(fe_Context *ctx, fe_Object *arg) {
   exit(EXIT_SUCCESS);

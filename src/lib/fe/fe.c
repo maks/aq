@@ -37,7 +37,7 @@
 
 #define STRBUFSIZE    ( (int) sizeof(fe_Object*) - 1 )
 #define GCMARKBIT     ( 0x2 )
-#define GCSTACKSIZE   ( 256 )
+#define GCSTACKSIZE   ( 2048 )
 
 
 enum {
