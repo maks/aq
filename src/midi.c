@@ -27,6 +27,8 @@ static void send_message(MidiMessage msg) {
 
 #ifdef __linux__
 
+/* Linux-only MIDI logging/debug (Windows not supported here). */
+
 #include <sys/select.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -40,6 +42,8 @@ static const int sizes[] = {
 
 typedef struct { int fd; } MidiInput;
 #define MAX_MIDI_IN_OUTS 16
+#define MAX_ALSA_CARDS 8
+#define MAX_ALSA_DEVS 8
 static MidiInput midi_inputs[MAX_MIDI_IN_OUTS];
 static FILE *midi_outputs[MAX_MIDI_IN_OUTS];
 
@@ -95,6 +99,7 @@ static int midi_thread(void *udata) {
 static void midi_platform_init(void) {
   char filename[32];
   int input_count = 0;
+  int output_count = 0;
   
   for (int i = 0; i < MAX_MIDI_IN_OUTS; i++) {
     midi_inputs[i].fd = -1;
@@ -104,19 +109,56 @@ static void midi_platform_init(void) {
     sprintf(filename, "/dev/midi%d", i);
     int fd = open(filename, O_RDONLY | O_NONBLOCK); 
     if (fd >= 0) {
+      fprintf(stderr, "midi: opened input %s (fd=%d)\n", filename, fd);
       midi_inputs[input_count].fd = fd;
       input_count++;
     }
   }
 
+
+  if (input_count == 0) {
+    fprintf(stderr, "midi: no input devices opened (checked /dev/midi0..%d and /dev/snd/midiC*D*)\n", MAX_MIDI_IN_OUTS - 1);
+  }
+
   for (int i = 1; i < MAX_MIDI_IN_OUTS; i++) {
     sprintf(filename, "/dev/midi%d", i);
     FILE *fp = fopen(filename, "wb");
-    if (fp) { 
+    if (fp) {
+      fprintf(stderr, "midi: opened output %s\n", filename);
       midi_outputs[i - 1] = fp;
+      output_count++;
     }
   }
-  
+
+  for (int c = 0; c < MAX_ALSA_CARDS; c++) {
+    for (int d = 0; d < MAX_ALSA_DEVS; d++) {
+      if (input_count >= MAX_MIDI_IN_OUTS && output_count >= MAX_MIDI_IN_OUTS) {
+        break;
+      }
+      sprintf(filename, "/dev/snd/midiC%dD%d", c, d);
+      if (input_count < MAX_MIDI_IN_OUTS) {
+        int fd = open(filename, O_RDONLY | O_NONBLOCK);
+        if (fd >= 0) {
+          fprintf(stderr, "midi: opened alsa input %s (fd=%d)\n", filename, fd);
+          midi_inputs[input_count].fd = fd;
+          input_count++;
+        }
+      }
+      if (output_count < MAX_MIDI_IN_OUTS) {
+        FILE *fp = fopen(filename, "wb");
+        if (fp) {
+          fprintf(stderr, "midi: opened alsa output %s\n", filename);
+          midi_outputs[output_count] = fp;
+          output_count++;
+        }
+      }
+    }
+  }
+
+  if (output_count == 0) {
+    fprintf(stderr, "midi: no output devices opened (checked /dev/midi1..%d and /dev/snd/midiC*D*)\n", MAX_MIDI_IN_OUTS - 1);
+  }
+
   SDL_CreateThread(midi_thread, "Midi Input", NULL);
 }
 
