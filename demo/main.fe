@@ -379,8 +379,10 @@
 (= selected-step (cons 60 nil))
 (= tick-count 0)
 (= frame-count 0)
+(= auto-load-save t)
 
 (= seq (map (par make-pattern-set 4 16) (range 6)))
+
 (= voice1 (make-bass "Synth1" 1))
 (= voice2 (make-bass "Synth2" 5))
 (= voice3 (make-drum "Drum1"))
@@ -392,6 +394,12 @@
 (= pattern-hotkeys '((1 Q A Z) (2 W S X) (3 E D C) (4 R F V) (5 T G B) (6 Y H N)))
 
 (func on-frame ()
+  (when auto-load-save
+    (= seq (or (read "save1") (read "demo/save1") seq))
+    (= last-selected-number 1)
+    (= auto-load-save nil)
+  )
+
   (ui:row '(326 18 0))
 
   (ui:column
