@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include <setjmp.h>
+#include <signal.h>
 #include <unistd.h>
 #include "dsp/dsp.h"
 #include "midi.h"
@@ -34,19 +35,30 @@ static void midi_callback(MidiMessage msg) {
 
 
 static mu_Container console_win;
+static volatile sig_atomic_t app_running = 1;
 
 
-void app_init(int argc, char **argv) {
-  if (argc > 1) { expect( chdir(argv[1]) == 0 ); }
+static void signal_handler(int signum) {
+  (void) signum;
+  app_running = 0;
+}
 
-  SDL_Init(SDL_INIT_EVERYTHING);
-#if _WIN32
-  SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
-#endif
-  app.fe_lock = SDL_CreateMutex();
 
-  /* init ui */
-  app.mu_ctx = ui_init(APP_TITLE);
+static void parse_args(int argc, char **argv, const char **project_dir) {
+  app.headless = false;
+  *project_dir = NULL;
+
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--headless") == 0 || strcmp(argv[i], "-H") == 0) {
+      app.headless = true;
+      continue;
+    }
+    if (!*project_dir) { *project_dir = argv[i]; }
+  }
+}
+
+
+static void init_ui_style(void) {
   app.mu_ctx->style->title_height = 22;
   app.mu_ctx->style->padding = 3;
   app.mu_ctx->style->size.y = 14;
@@ -63,19 +75,46 @@ void app_init(int argc, char **argv) {
   app.mu_ctx->style->colors[MU_COLOR_BORDER      ] = mu_color(65, 65, 65, 255);
   app.mu_ctx->style->colors[MU_COLOR_SCROLLBASE  ] = mu_color(0, 0, 0, 0);
   app.mu_ctx->style->colors[MU_COLOR_SCROLLTHUMB ] = mu_color(255, 255, 255, 20);
+}
 
-  /* init console window */
-  mu_init_window(app.mu_ctx, &console_win, 0);
-  console_win.rect = mu_rect(300, 40, 400, 230);
-  console_win.zindex = 0xffffff;
-  console_win.open = false;
+
+void app_init(int argc, char **argv) {
+  const char *project_dir;
+  parse_args(argc, argv, &project_dir);
+  if (project_dir) { expect( chdir(project_dir) == 0 ); }
+
+  uint32_t sdl_flags = SDL_INIT_AUDIO | SDL_INIT_TIMER;
+  if (!app.headless) { sdl_flags |= SDL_INIT_VIDEO; }
+  expect(SDL_Init(sdl_flags) == 0);
+#if _WIN32
+  if (!app.headless) {
+    SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
+  }
+#endif
+  app.fe_lock = SDL_CreateMutex();
+  signal(SIGINT, signal_handler);
+  signal(SIGTERM, signal_handler);
+
+  if (!app.headless) {
+    /* init ui */
+    app.mu_ctx = ui_init(APP_TITLE);
+    init_ui_style();
+
+    /* init console window */
+    mu_init_window(app.mu_ctx, &console_win, 0);
+    console_win.rect = mu_rect(300, 40, 400, 230);
+    console_win.zindex = 0xffffff;
+    console_win.open = false;
+  }
 
   /* init `fe` */
   int bytes = 1024 * 256;
   app.fe_ctx = fe_open(malloc(bytes), bytes);
 
   extern fex_Reg api_core []; fex_register_funcs(app.fe_ctx, api_core );
-  extern fex_Reg api_ui   []; fex_register_funcs(app.fe_ctx, api_ui   );
+  if (!app.headless) {
+    extern fex_Reg api_ui   []; fex_register_funcs(app.fe_ctx, api_ui   );
+  }
   extern fex_Reg api_dsp  []; fex_register_funcs(app.fe_ctx, api_dsp  );
 
   /* init dsp and midi */
@@ -175,11 +214,17 @@ static void process_frame(mu_Context *ctx) {
 
 
 void app_run(void) {
-  /* main loop */
-  for (;;) {
-    ui_begin_frame(app.mu_ctx);
-    process_frame(app.mu_ctx);
-    ui_end_frame(app.mu_ctx);
+  if (app.headless) {
+    while (app_running) {
+      SDL_Delay(1);
+    }
+  } else {
+    while (app_running) {
+      ui_begin_frame(app.mu_ctx);
+      process_frame(app.mu_ctx);
+      ui_end_frame(app.mu_ctx);
+      midi_poll();
+    }
   }
 }
 
@@ -199,7 +244,7 @@ void app_log(const char *str) {
 
 
 void app_log_error(const char *str) {
-  console_win.open = true;
+  if (!app.headless) { console_win.open = true; }
   app_log(str);
 
 }

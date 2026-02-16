@@ -19,6 +19,10 @@ void midi_send(MidiMessage msg) {
 }
 
 
+void midi_poll(void) {
+}
+
+
 static void send_message(MidiMessage msg) {
   if (midi_callback) { midi_callback(msg); }
 }

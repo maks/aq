@@ -469,6 +469,12 @@
 
 
 (func on-tick ()
+  (when auto-load-save
+    (= seq (or (read "save1") (read "demo/save1") seq))
+    (= last-selected-number 1)
+    (= auto-load-save nil)
+  )
+
   (tick-pattern-set (nth 0 seq) voice1)
   (tick-pattern-set (nth 1 seq) voice2)
   (tick-pattern-set (nth 2 seq) voice3)

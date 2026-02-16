@@ -10,6 +10,7 @@
 #define APP_TITLE "aq"
 
 typedef struct {
+  bool headless;
   mu_Context *mu_ctx;
   fe_Context *fe_ctx;
   SDL_mutex *fe_lock;
