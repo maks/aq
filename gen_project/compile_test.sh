@@ -1,23 +1,20 @@
 #!/bin/bash
 set -e
 
-# 1. Build the main 'aq' executable so we can run the generator
-echo "==> Building aq generator executable"
+# 1. Build the main 'aq' executable
 cd ..
 python3 build.py
 cd gen_project
 
-# 2. Run the generator script to create graph.c
-echo "==> Generating graph.c from FE script"
-../aq --headless . generator.fe > graph.c
-echo "Generated graph.c:"
-cat graph.c
-echo ""
+# 2. Run the generator script (now named main.fe for auto-loading)
+echo "==> Generating graph.c (Silence)"
+../aq --headless ../demo ../gen_project/generator.fe > graph.c
 
-# 3. Build the combined executable using the Makefile
-echo "==> Building combined C executable using the generated graph.c and aq's DSP core"
+# 3. Build the native test app
+echo "==> Compiling native test app"
+make clean
 make
 
-# 4. Run the combined executable
-echo "==> Running compiled test_app (you should hear a synth sound for 5s)"
+# 4. Run the test app for 2 loops only
+echo "==> Running native test app (2 loops only)"
 ./test_app
