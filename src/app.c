@@ -46,6 +46,7 @@ static void signal_handler(int signum) {
 
 static void parse_args(int argc, char **argv, const char **project_dir) {
   app.headless = false;
+  app.script_file = "main.fe";
   *project_dir = NULL;
 
   for (int i = 1; i < argc; i++) {
@@ -53,7 +54,9 @@ static void parse_args(int argc, char **argv, const char **project_dir) {
       app.headless = true;
       continue;
     }
-    if (!*project_dir) { *project_dir = argv[i]; }
+    if (argv[i][0] == '-') { continue; }
+    if (!*project_dir) { *project_dir = argv[i]; continue; }
+    app.script_file = argv[i];
   }
 }
 
@@ -123,8 +126,12 @@ void app_init(int argc, char **argv) {
 
   /* init scripts */
   app_fe_push();
-  app_do_file("main.fe");
+  app_do_file(app.script_file);
   app_fe_pop();
+
+  if (app.headless) {
+    exit(EXIT_SUCCESS);
+  }
 }
 
 

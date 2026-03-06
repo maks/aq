@@ -2,15 +2,17 @@
 #define APP_H
 
 #include <SDL2/SDL.h>
-#include "common.h"
-#include "fex.h"
+#include "lib/fe/fe.h"
+#include "lib/microui/microui.h"
 #include "ui.h"
 #include "renderer.h"
+#include "fex.h"
 
 #define APP_TITLE "aq"
 
 typedef struct {
   bool headless;
+  const char *script_file;
   mu_Context *mu_ctx;
   fe_Context *fe_ctx;
   SDL_mutex *fe_lock;

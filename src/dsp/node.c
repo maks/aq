@@ -41,6 +41,9 @@ void node_free(Node *node) {
 
 
 int node_receive(Node *node, const char *str, char *err) {
+  if (node->vtable && node->vtable->receive) {
+    return node->vtable->receive(node, str, err);
+  }
   sprintf(err, "node does not support messages");
   return -1;
 }
