@@ -1,0 +1,16 @@
+# gen_project build artifacts
+gen_project/graph.c
+gen_project/full_graph.c
+gen_project/test_app
+gen_project/test_app.exe
+gen_project/*.o
+
+# Global build artifacts
+*.o
+.buildcache/
+__pycache__/
+aq
+aq.exe
+out.raw
+save*
+!demo/save1

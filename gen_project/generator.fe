@@ -1,0 +1,59 @@
+;; 1. Load standard library
+(do-file "../demo/common.fe")
+
+;; 2. Mock the UI system so main.fe doesn't crash
+(func ui:row args nil)
+(func ui:column args nil)
+(func ui:label args nil)
+(func ui:button args nil)
+(func ui:unlabeled-button args nil)
+(func ui:meter args 0)
+(func ui:slider3 args 0)
+(func ui:number (l v) v)
+(func ui:selected () nil)
+(func ui:highlight () nil)
+(func ui:with-id (id body) body)
+(func ui:key-pressed (k) nil)
+(func ui:scope (n p) nil)
+
+;; 3. Setup the C Generator Shadowing
+(= var-counter 0)
+(func new-var () (++ var-counter) (string "node_" var-counter))
+(func emit-c (line) (echo line))
+
+(func dsp:new (type)
+  (let var (new-var))
+  (emit-c (string "  int " var " = dsp_new_node(\"" type "\");"))
+  var)
+
+(func dsp:link (node1 out node2 in)
+  (emit-c (string "  node_link(dsp_get_node(" node1 "), \"" out "\", dsp_get_node(" node2 "), \"" in "\");"))
+  nil)
+
+(func dsp:set (node in val)
+  (emit-c (string "  node_set(dsp_get_node(" node "), \"" in "\", " val ");"))
+  nil)
+
+(func dsp:send (node str)
+  (emit-c (string "  node_receive(dsp_get_node(" node "), \"" str "\", err_buf);"))
+  nil)
+
+(func dsp:set-tick (t) nil)
+(func dsp:get (n p) 0)
+
+;; 4. Load the DSP helper (for dsp:chain support)
+(do-file "../demo/dsp.fe")
+
+;; 5. Run the actual main.fe script
+(emit-c "#include <stdio.h>")
+(emit-c "#include \"dsp/dsp.h\"")
+(emit-c "#include \"dsp/node.h\"")
+(emit-c "")
+(emit-c "void setup_graph(void) {")
+(emit-c "  char err_buf[NODE_MAX_ERROR];")
+
+(do-file "../demo/main.fe")
+
+(emit-c "}")
+
+(exit)
