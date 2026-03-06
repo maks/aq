@@ -14,6 +14,18 @@ if "windows" in opt:
     # lflags += [ "-mwindows" ]
     lflags.remove("-lGL")
 
+if "rpi" in opt:
+    target = "aarch64-linux-musl"
+    compiler = "zig cc -target " + target
+
+    for o in opt:
+        if o.startswith("sysroot="):
+            compiler += " --sysroot " + o.split("=")[1]
+            
+    lflags = ["-lSDL2", "-lSDL2main", "-lGL", "-lm"]
+    cflags = ["-std=gnu11", "-Wall", "-Werror"]
+    output = "aq-aarch64"
+
 if "sanitize" in opt:
     lflags += [ "-fsanitize=address" ]
     cflags += [ "-fsanitize=address" ]
